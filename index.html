@@ -2,78 +2,151 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>魔法のトーストタイマー (Cloudflare版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>究極の魔法タイマー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #fffaf2; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
-        .card { background: white; border-radius: 30px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 350px; border: 5px solid #ffedda; text-align: center; }
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap');
+        body { font-family: 'Zen Maru Gothic', sans-serif; background: #fffaf2; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); width: 100%; max-width: 400px; border: 8px solid #ffedda; }
+        .timer-bg { background: linear-gradient(135deg, #f97316 0%, #ef4444 100%); border-radius: 30px; padding: 40px 20px; text-align: center; color: white; margin-bottom: 25px; }
+        .btn-circle { width: 55px; height: 55px; border-radius: 50%; border: 3px solid #ffedda; background: white; font-weight: bold; color: #f97316; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-magic { background: #ea580c; color: white; border-radius: 20px; padding: 15px; font-weight: 900; width: 100%; font-size: 18px; box-shadow: 0 5px 0 #9a3412; cursor: pointer; border: none; }
+        .btn-magic:active { transform: translateY(3px); box-shadow: 0 2px 0 #9a3412; }
+        .btn-magic:disabled { opacity: 0.5; cursor: not-allowed; }
+        input { border: 3px solid #ffedda; border-radius: 15px; padding: 12px; width: 100%; text-align: center; font-size: 16px; margin-bottom: 12px; outline: none; }
+        #errorLog { color: #ef4444; font-size: 11px; margin-top: 15px; text-align: left; background: #fee2e2; padding: 12px; border-radius: 12px; display: none; line-height: 1.5; }
         .hidden { display: none; }
-        #log { color: #ef4444; font-size: 11px; background: #fee2e2; padding: 10px; border-radius: 10px; margin-top: 10px; display: none; text-align: left; word-break: break-all; }
     </style>
 </head>
 <body>
-    <div id="login" class="card">
-        <h1 class="text-xl font-bold text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <p class="text-xs mb-2">Google AI Studioのキーを入力</p>
-        <input type="password" id="key" placeholder="AIza...で始まるキー" class="border p-2 w-full rounded mb-2 text-center">
-        <div id="log"></div>
-        <button id="btn" onclick="check()" class="bg-orange-600 text-white p-3 w-full rounded-xl font-bold mt-2">スタート！</button>
+    <div id="login" class="card text-center">
+        <h1 class="text-2xl font-black text-orange-600 mb-6">🍞 魔法のタイマー</h1>
+        <p class="text-sm text-gray-500 mb-4">APIキーを貼り付けてね</p>
+        <input type="password" id="key" placeholder="AIza...から始まるキー">
+        <div id="errorLog"></div>
+        <button id="startBtn" onclick="checkKey()" class="btn-magic mt-4">スタート！</button>
     </div>
-    <div id="main" class="card hidden">
-        <div class="bg-orange-500 text-white rounded-2xl p-6 mb-4">
-            <div id="time" class="text-6xl font-bold">03:00</div>
+    <div id="main" class="card hidden text-center">
+        <div class="timer-bg">
+            <div id="timeDisp" class="text-7xl font-black">03:00</div>
+            <p class="text-xs mt-2 font-bold opacity-80">おいしくなる 魔法の時間</p>
         </div>
-        <p class="text-sm text-green-600 font-bold mt-4">✨ 接続成功！</p>
-        <p class="text-xs text-gray-500 mt-2">クラウドフレア経由で接続しました</p>
+        <div class="space-y-6">
+            <div class="flex justify-between items-center font-bold">
+                <span class="text-xl text-red-500">温度(℃)</span>
+                <div class="flex items-center gap-4">
+                    <button onclick="adj(-10)" class="btn-circle">ー</button>
+                    <span id="tempDisp" class="text-2xl w-14">200</span>
+                    <button onclick="adj(10)" class="btn-circle">＋</button>
+                </div>
+            </div>
+            <div class="border-t-4 border-orange-50 pt-6">
+                <input type="text" id="bread" placeholder="パンの名前 (例: クロワッサン)">
+                <button id="aiBtn" onclick="askAi()" class="btn-magic text-sm py-4">AIに相談する ✨</button>
+                <p id="aiStatus" class="text-xs font-bold text-orange-500 mt-3 h-4"></p>
+            </div>
+        </div>
     </div>
-<script>
-        async function check() {
-            const key = document.getElementById('key').value.trim();
-            const log = document.getElementById('log');
-            const btn = document.getElementById('btn');
+    <script>
+        let apiKey = "";
+        let currentTemp = 200;
+        // 制限に強く、最も安定しているモデル名
+        const MODEL = "gemini-1.5-flash";
+
+        async function checkKey() {
+            const input = document.getElementById('key').value.trim();
+            const log = document.getElementById('errorLog');
+            const btn = document.getElementById('startBtn');
             
-            if(!key) { log.innerText = "キーを入力してください"; log.style.display="block"; return; }
+            if(!input) { showError("キーを入力してください"); return; }
             
+            btn.disabled = true;
             log.style.display = "block";
             log.style.color = "orange";
-            log.innerText = "AIを呼び出しています...";
-            btn.disabled = true;
-
-            // Cloudflare環境でも通りやすい標準エンドポイント
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+            log.innerText = "接続を確認中...";
 
             try {
-                const res = await fetch(url, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${input}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    // 通信を安定させるための最小限のデータ
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: "Short hello" }] }]
-                    })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
                 });
 
                 const data = await res.json();
 
                 if (res.ok) {
-                    document.getElementById('login').className = "hidden";
-                    document.getElementById('main').className = "card";
+                    apiKey = input;
+                    document.getElementById('login').classList.add('hidden');
+                    document.getElementById('main').classList.remove('hidden');
+                    update();
                 } else {
-                    log.style.color = "#ef4444";
-                    // Googleからのエラー内容を詳しく表示
-                    let errorMsg = data.error ? data.error.message : "不明なエラー";
-                    log.innerHTML = `<b>エラーが発生しました</b><br>
-                                    内容: ${errorMsg}<br>
-                                    <span style="font-size:9px">※キーがGemini 1.5に対応していない可能性があります。</span>`;
+                    let msg = "エラー：";
+                    if (data.error && data.error.message.includes("quota")) {
+                        msg = "【回数制限エラー】30秒ほど待ってからやり直してください。";
+                    } else {
+                        msg += data.error ? data.error.message : "キーが違います。";
+                    }
+                    showError(msg);
                 }
             } catch (e) {
-                log.style.color = "#ef4444";
-                log.innerText = "ネットワークエラー: Cloudflareからの通信がブロックされました。";
+                showError("ネットワークエラー：接続できませんでした。");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function showError(m) {
+            const log = document.getElementById('errorLog');
+            log.innerText = m;
+            log.style.display = "block";
+            log.style.color = "#ef4444";
+        }
+
+        function adj(v) {
+            currentTemp = Math.max(100, Math.min(250, currentTemp + v));
+            document.getElementById('tempDisp').innerText = currentTemp;
+            update();
+        }
+
+        function update() {
+            let sec = Math.round(180 * (200 / currentTemp));
+            let m = Math.floor(sec / 60);
+            let s = sec % 60;
+            document.getElementById('timeDisp').innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        async function askAi() {
+            const bread = document.getElementById('bread').value || "トースト";
+            const status = document.getElementById('aiStatus');
+            const btn = document.getElementById('aiBtn');
+            btn.disabled = true;
+            status.innerText = "AIが考え中...";
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: [{parts: [{text: `「${bread}」をトースターで焼く温度を数字だけで1つ答えて。例: 180`}]}]
+                    })
+                });
+                const data = await res.json();
+                const num = data.candidates[0].content.parts[0].text.match(/\d+/);
+                if (num) {
+                    currentTemp = parseInt(num[0]);
+                    document.getElementById('tempDisp').innerText = currentTemp;
+                    update();
+                    status.innerText = "✨ セットしました！";
+                } else {
+                    status.innerText = "温度がわかりませんでした。";
+                }
+            } catch (e) {
+                status.innerText = "エラー：少し待ってやり直してね。";
             } finally {
                 btn.disabled = false;
             }
         }
     </script>
 </body>
-</html>    
+</html>
