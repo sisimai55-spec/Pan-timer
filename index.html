@@ -2,7 +2,6 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>魔法のトーストタイマー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -39,9 +38,11 @@
         <input type="text" id="bread" placeholder="パンの名前" class="mt-6">
         <button id="aiBtn" onclick="ask()" class="btn-magic text-sm mt-2">AIに相談 ✨</button>
     </div>
- <script>
+    <script>
         let k = "";
         let t = 200;
+        // 最新の安定モデル名を指定
+        const MODEL_NAME = "gemini-1.5-flash-latest";
 
         async function check() {
             const val = document.getElementById('key').value.trim();
@@ -51,11 +52,12 @@
 
             btn.disabled = true;
             log.style.display = "block";
-            log.innerText = "接続テスト中...";
+            log.innerText = "接続確認中...";
 
             try {
-                // 【修正ポイント】URLの形式を /models/ から / に変更
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`, {
+                // モデル名の前に models/ を明示的に付与
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${val}`;
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
@@ -68,10 +70,10 @@
                     document.getElementById('main').className = "card";
                     update();
                 } else {
-                    log.innerText = "エラー: " + (data.error ? data.error.message : "キーが違います");
+                    log.innerText = "エラー: " + (data.error ? data.error.message : "接続失敗");
                 }
             } catch (e) {
-                log.innerText = "ネットワーク接続エラー";
+                log.innerText = "ネットワークエラー";
             } finally { btn.disabled = false; }
         }
 
@@ -91,7 +93,8 @@
             const btn = document.getElementById('aiBtn');
             btn.disabled = true;
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`, {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${k}`;
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({contents: [{parts: [{text: `${b}を焼く温度を数字1つで答えて`}]}]})
@@ -104,4 +107,4 @@
         }
     </script>
 </body>
-</html>   
+</html>
