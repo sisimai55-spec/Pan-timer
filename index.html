@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>魔法のトーストタイマー</title>
+    <title>魔法のタイマー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #fffaf2; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
@@ -14,7 +14,7 @@
 <body>
     <div id="login" class="card">
         <h1 class="text-xl font-bold text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <p class="text-xs mb-2">APIキーを入力（にゅうりょく）してね</p>
+        <p class="text-xs mb-2">APIキーを入力してください</p>
         <input type="password" id="keyInput" placeholder="AIza...で始まるキー" class="border p-2 w-full rounded mb-2 text-center">
         <div id="errorLog"></div>
         <button id="btn" onclick="check()" class="bg-orange-600 text-white p-3 w-full rounded-xl font-bold mt-2">スタート！</button>
@@ -24,7 +24,6 @@
             <div id="time" class="text-6xl font-bold">03:00</div>
         </div>
         <p class="text-sm text-green-600 font-bold mt-4">✨ つながりました！</p>
-        <p class="text-xs text-gray-500 mt-2">AIが使えるようになりました。</p>
     </div>
     <script>
         async function check() {
@@ -32,10 +31,10 @@
             const log = document.getElementById('errorLog');
             const btn = document.getElementById('btn');
             
-            // ★ モデルの名前を「絶対に存在する最新版」に書き換えました
-            const MODEL = "gemini-2.0-flash-preview-09-2025";
+            // ★ モデル名を「もっとも標準的な名前」に変更しました
+            const MODEL = "gemini-1.5-flash-latest";
             
-            if(!key) { log.innerText = "キーが空っぽだよ"; log.style.display="block"; return; }
+            if(!key) { log.innerText = "キーが空っぽです"; log.style.display="block"; return; }
             
             log.style.display = "block";
             log.style.color = "orange";
@@ -43,6 +42,7 @@
             btn.disabled = true;
 
             try {
+                // モデル名の指定方法を微調整
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
                 const res = await fetch(url, {
                     method: 'POST',
@@ -62,7 +62,7 @@
                                     状態: ${data.error ? data.error.status : "NULL"}`;
                 }
             } catch (e) {
-                log.innerText = "接続（せつぞく）に失敗しました。";
+                log.innerText = "通信に失敗しました。";
                 log.style.color = "#ef4444";
             } finally {
                 btn.disabled = false;
