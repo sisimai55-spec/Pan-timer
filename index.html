@@ -5,7 +5,7 @@
     <title>魔法のトーストタイマー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@900&display=swap');
         body { font-family: 'Zen Maru Gothic', sans-serif; background: #fffaf2; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
         .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 100%; max-width: 380px; border: 6px solid #ffedda; }
         .timer-bg { background: linear-gradient(135deg, #f97316, #ef4444); border-radius: 30px; padding: 35px 10px; text-align: center; color: white; margin-bottom: 20px; }
@@ -19,7 +19,8 @@
 <body>
     <div id="login" class="card text-center">
         <h1 class="text-xl font-black text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <input type="password" id="key" placeholder="AIza...で始まるキーを入力">
+        <p class="text-[10px] text-gray-400 mb-2">最適なAIを自動で探します</p>
+        <input type="password" id="key" placeholder="APIキーを入力">
         <div id="log"></div>
         <button id="sBtn" onclick="check()" class="btn-magic mt-2">スタート！</button>
     </div>
@@ -37,12 +38,11 @@
         </div>
         <input type="text" id="bread" placeholder="パンの名前" class="mt-6">
         <button id="aiBtn" onclick="ask()" class="btn-magic text-sm mt-2">AIに相談 ✨</button>
-    </div>
-    <script>
+        <p id="usedModel" class="text-[8px] text-gray-300 mt-4"></p>
+    </div><script>
         let k = "";
         let t = 200;
-        // 最新の安定モデル名を指定
-        const MODEL_NAME = "gemini-1.5-flash-latest";
+        let activeModel = "";
 
         async function check() {
             const val = document.getElementById('key').value.trim();
@@ -52,29 +52,41 @@
 
             btn.disabled = true;
             log.style.display = "block";
-            log.innerText = "接続確認中...";
+            log.style.color = "orange";
+            log.innerText = "利用可能なAIを探索中...";
 
-            try {
-                // モデル名の前に models/ を明示的に付与
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${val}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
-                });
+            // 試行するモデルの優先リスト
+            const models = [
+                "gemini-1.5-flash-latest",
+                "gemini-1.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-pro"
+            ];
 
-                const data = await res.json();
-                if (res.ok) {
-                    k = val;
-                    document.getElementById('login').className = "hidden";
-                    document.getElementById('main').className = "card";
-                    update();
-                } else {
-                    log.innerText = "エラー: " + (data.error ? data.error.message : "接続失敗");
-                }
-            } catch (e) {
-                log.innerText = "ネットワークエラー";
-            } finally { btn.disabled = false; }
+            for (let mName of models) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${val}`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                    });
+
+                    if (res.ok) {
+                        k = val;
+                        activeModel = mName;
+                        document.getElementById('login').className = "hidden";
+                        document.getElementById('main').className = "card";
+                        document.getElementById('usedModel').innerText = "Connected: " + mName;
+                        update();
+                        return; // 成功したら終了
+                    }
+                } catch (e) { continue; }
+            }
+
+            log.style.color = "#ef4444";
+            log.innerText = "エラー: 適切なAIモデルが見つかりませんでした。キーと設定を確認してください。";
+            btn.disabled = false;
         }
 
         function adj(v) {
@@ -93,7 +105,7 @@
             const btn = document.getElementById('aiBtn');
             btn.disabled = true;
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${k}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${k}`;
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
