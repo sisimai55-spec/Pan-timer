@@ -2,78 +2,87 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>魔法のタイマー</title>
+    <title>魔法のトーストタイマー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #fffaf2; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
         .card { background: white; border-radius: 30px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 350px; border: 5px solid #ffedda; text-align: center; }
         .hidden { display: none; }
-        #errorLog { color: #ef4444; font-size: 11px; background: #fee2e2; padding: 10px; border-radius: 10px; margin-top: 10px; display: none; text-align: left; word-break: break-all; }
+        #log { color: #ef4444; font-size: 11px; background: #fee2e2; padding: 10px; border-radius: 10px; margin-top: 10px; display: none; text-align: left; }
     </style>
 </head>
 <body>
     <div id="login" class="card">
         <h1 class="text-xl font-bold text-orange-600 mb-4">🍞 魔法のタイマー</h1>
         <p class="text-xs mb-2">APIキーを入力してください</p>
-        <input type="password" id="keyInput" placeholder="AIza...で始まるキー" class="border p-2 w-full rounded mb-2 text-center">
-        <div id="errorLog"></div>
+        <input type="password" id="key" placeholder="AIza...で始まるキー" class="border p-2 w-full rounded mb-2 text-center">
+        <div id="log"></div>
         <button id="btn" onclick="check()" class="bg-orange-600 text-white p-3 w-full rounded-xl font-bold mt-2">スタート！</button>
     </div>
     <div id="main" class="card hidden">
         <div class="bg-orange-500 text-white rounded-2xl p-6 mb-4">
             <div id="time" class="text-6xl font-bold">03:00</div>
         </div>
-        <p class="text-sm text-green-600 font-bold mt-4">✨ つながりました！</p>
-        <p id="usedModel" class="text-[9px] text-gray-400 mt-2"></p>
+        <p class="text-sm text-green-600 font-bold mt-4">✨ 接続成功！</p>
+        <p id="info" class="text-[9px] text-gray-400 mt-2"></p>
     </div>
-<script>
+    <script>
         async function check() {
-            const key = document.getElementById('keyInput').value.trim();
-            const log = document.getElementById('errorLog');
+            const key = document.getElementById('key').value.trim();
+            const log = document.getElementById('log');
             const btn = document.getElementById('btn');
             
             if(!key) { log.innerText = "キーを入力してください"; log.style.display="block"; return; }
             
             log.style.display = "block";
             log.style.color = "orange";
-            log.innerText = "使えるAIを探しています...";
+            log.innerText = "利用可能なAIを探しています...";
             btn.disabled = true;
 
-            // 試すモデルの名前リスト
-            const models = [
-                "gemini-1.5-flash",
-                "gemini-1.5-flash-8b",
-                "gemini-2.0-flash-exp",
-                "gemini-1.0-pro"
-            ];
+            try {
+                // 手順1: 今のキーで使えるモデルの一覧を取得する
+                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+                const listRes = await fetch(listUrl);
+                const listData = await listRes.json();
 
-            let success = false;
-            for (let modelName of models) {
-                try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
-                    });
+                if (!listRes.ok) {
+                    throw new Error(listData.error ? listData.error.message : "キーが正しくありません");
+                }
 
-                    if (res.ok) {
-                        document.getElementById('login').className = "hidden";
-                        document.getElementById('main').className = "card";
-                        document.getElementById('usedModel').innerText = "使用中: " + modelName;
-                        success = true;
-                        break; 
-                    }
-                } catch (e) { continue; }
-            }
+                // 手順2: リストの中から generateContent が使えるモデルを探す
+                const targetModel = listData.models.find(m => 
+                    m.supportedGenerationMethods.includes("generateContent") && 
+                    (m.name.includes("gemini-1.5-flash") || m.name.includes("gemini-pro"))
+                );
 
-            if (!success) {
+                if (!targetModel) {
+                    throw new Error("このキーで使える適切なAIが見つかりませんでした");
+                }
+
+                // 手順3: 見つかったモデルでテスト通信
+                const testUrl = `https://generativelanguage.googleapis.com/v1beta/${targetModel.name}:generateContent?key=${key}`;
+                const testRes = await fetch(testUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                });
+
+                if (testRes.ok) {
+                    document.getElementById('login').className = "hidden";
+                    document.getElementById('main').className = "card";
+                    document.getElementById('info').innerText = "Model: " + targetModel.name;
+                } else {
+                    const testData = await testRes.json();
+                    throw new Error(testData.error.message);
+                }
+
+            } catch (e) {
                 log.style.color = "#ef4444";
-                log.innerHTML = `<b>エラー: AIが見つかりません</b><br>
-                                キーは正しいようですが、この環境で動くAIの名前が見つかりませんでした。`;
+                log.innerHTML = `<b>エラーが発生しました</b><br>理由: ${e.message}`;
+            } finally {
                 btn.disabled = false;
             }
         }
     </script>
 </body>
-</html>    
+</html>
