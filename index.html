@@ -24,50 +24,56 @@
             <div id="time" class="text-6xl font-bold">03:00</div>
         </div>
         <p class="text-sm text-green-600 font-bold mt-4">✨ つながりました！</p>
+        <p id="usedModel" class="text-[9px] text-gray-400 mt-2"></p>
     </div>
-    <script>
+<script>
         async function check() {
             const key = document.getElementById('keyInput').value.trim();
             const log = document.getElementById('errorLog');
             const btn = document.getElementById('btn');
             
-            // ★ モデル名を「もっとも標準的な名前」に変更しました
-            const MODEL = "gemini-1.5-flash-latest";
-            
-            if(!key) { log.innerText = "キーが空っぽです"; log.style.display="block"; return; }
+            if(!key) { log.innerText = "キーを入力してください"; log.style.display="block"; return; }
             
             log.style.display = "block";
             log.style.color = "orange";
-            log.innerText = "チェック中...";
+            log.innerText = "使えるAIを探しています...";
             btn.disabled = true;
 
-            try {
-                // モデル名の指定方法を微調整
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
-                });
+            // 試すモデルの名前リスト
+            const models = [
+                "gemini-1.5-flash",
+                "gemini-1.5-flash-8b",
+                "gemini-2.0-flash-exp",
+                "gemini-1.0-pro"
+            ];
 
-                const data = await res.json();
+            let success = false;
+            for (let modelName of models) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                    });
 
-                if (res.ok) {
-                    document.getElementById('login').className = "hidden";
-                    document.getElementById('main').className = "card";
-                } else {
-                    log.style.color = "#ef4444";
-                    log.innerHTML = `<b>エラーが発生しました</b><br>
-                                    理由: ${data.error ? data.error.message : "不明"}<br>
-                                    状態: ${data.error ? data.error.status : "NULL"}`;
-                }
-            } catch (e) {
-                log.innerText = "通信に失敗しました。";
+                    if (res.ok) {
+                        document.getElementById('login').className = "hidden";
+                        document.getElementById('main').className = "card";
+                        document.getElementById('usedModel').innerText = "使用中: " + modelName;
+                        success = true;
+                        break; 
+                    }
+                } catch (e) { continue; }
+            }
+
+            if (!success) {
                 log.style.color = "#ef4444";
-            } finally {
+                log.innerHTML = `<b>エラー: AIが見つかりません</b><br>
+                                キーは正しいようですが、この環境で動くAIの名前が見つかりませんでした。`;
                 btn.disabled = false;
             }
         }
     </script>
 </body>
-</html>
+</html>    
