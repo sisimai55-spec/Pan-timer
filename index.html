@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔法のトーストタイマー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap');
+        body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #fffaf2; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); width: 100%; max-width: 400px; border: 8px solid #ffedda; }
+        .timer-bg { background: linear-gradient(135deg, #f97316, #ef4444); color: white; border-radius: 30px; padding: 40px 20px; text-align: center; margin-bottom: 20px; }
+        .circle-btn { width: 55px; height: 55px; border-radius: 50%; border: 3px solid #ffedda; background: white; font-weight: bold; color: #f97316; font-size: 24px; cursor: pointer; }
+        .action-btn { background: #fff7ed; border: 2px solid #ffedda; color: #f97316; border-radius: 15px; padding: 12px; font-weight: bold; font-size: 14px; width: 100%; cursor: pointer; }
+        .magic-btn { background: #ea580c; color: white; border-radius: 20px; padding: 15px; font-weight: 900; width: 100%; font-size: 18px; box-shadow: 0 5px 0 #9a3412; cursor: pointer; }
+        .magic-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #9a3412; }
+        input { border: 3px solid #ffedda; border-radius: 15px; padding: 12px; width: 100%; text-align: center; font-size: 16px; margin-bottom: 10px; outline: none; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="loginPage" class="card text-center">
+        <div class="text-7xl mb-4">🍞</div>
+        <h1 class="text-2xl font-black text-orange-600 mb-6">魔法のトーストタイマー</h1>
+        <input type="password" id="keyInput" placeholder="APIキーを入力" class="mb-6">
+        <button onclick="login()" class="magic-btn">スタート！</button>
+    </div>
+    <div id="mainPage" class="card hidden">
+        <div class="timer-bg">
+            <div id="timerTxt" class="text-7xl font-black tracking-tighter">03:00</div>
+            <p class="font-bold opacity-90 mt-2">おいしくなる魔法の時間</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-6">
+            <button onclick="getInfo('fact')" class="action-btn">🔊 豆知識</button>
+            <button onclick="getInfo('drink')" class="action-btn">🥤 飲み物</button>
+        </div>
+        <div class="space-y-4 mb-6">
+            <div class="flex justify-between items-center text-xl font-black">
+                <span class="text-red-500">おんど(℃)</span>
+                <div class="flex items-center gap-3">
+                    <button onclick="adjT(-10)" class="circle-btn">ー</button>
+                    <span id="txtT" class="w-12 text-center">200</span>
+                    <button onclick="adjT(10)" class="circle-btn">＋</button>
+                </div>
+            </div>
+            <div class="flex justify-between items-center text-xl font-black">
+                <span class="text-orange-500">あつさ(枚)</span>
+                <div class="flex items-center gap-3">
+                    <button onclick="adjS(-1)" class="circle-btn">ー</button>
+                    <span id="txtS" class="w-12 text-center">6</span>
+                    <button onclick="adjS(1)" class="circle-btn">＋</button>
+                </div>
+            </div>
+        </div>
+        <div class="border-t-4 border-orange-50 pt-4 text-center">
+            <input type="text" id="breadIn" placeholder="パンの名前(チョコパンなど)">
+            <div class="flex gap-2">
+                <button onclick="getInfo('tip')" class="action-btn flex-1">💡 コツ</button>
+                <button id="aiBtn" onclick="runAi()" class="magic-btn flex-1 text-sm py-3">自動設定 ✨</button>
+            </div>
+            <p id="status" class="text-xs font-bold text-orange-500 mt-3 h-4"></p>
+        </div>
+    </div>
+<script>
+        let apiKey = ""; let temp = 200; let slice = 6; let aiData = null;
+        function login() {
+            apiKey = document.getElementById('keyInput').value.trim();
+            if (!apiKey) return alert("キーを入れてね");
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('mainPage').classList.remove('hidden');
+            update();
+        }
+        function adjT(v) { temp = Math.max(100, Math.min(250, temp + v)); document.getElementById('txtT').innerText = temp; update(); }
+        function adjS(v) { slice = Math.max(1, Math.min(12, slice + v)); document.getElementById('txtS').innerText = slice; update(); }
+        function update() {
+            let sec = Math.round(180 * (6 / slice) * (200 / temp));
+            document.getElementById('timerTxt').innerText = `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+        }
+        async function runAi() {
+            const bread = document.getElementById('breadIn').value || "トースト";
+            const status = document.getElementById('status');
+            document.getElementById('aiBtn').disabled = true;
+            status.innerText = "AIがかんがえ中...";
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `「${bread}」の焼き方をJSONで：{"temp":数値,"fact":"豆知識","drink":"飲み物","tip":"コツ"}` }] }], generationConfig: { responseMimeType: "application/json" } })
+                });
+                const json = await res.json();
+                aiData = JSON.parse(json.candidates[0].content.parts[0].text);
+                if (aiData.temp) { temp = aiData.temp; document.getElementById('txtT').innerText = temp; update(); }
+                status.innerText = "✨ セット完了！";
+            } catch (e) { status.innerText = "❌ エラー：キーを確認してね"; }
+            document.getElementById('aiBtn').disabled = false;
+        }
+        function getInfo(type) {
+            if (!aiData) return alert("先に自動設定をおしてね");
+            const msg = { fact: aiData.fact, drink: aiData.drink, tip: aiData.tip }[type];
+            alert(msg);
+            if (type === 'fact') speak(aiData.fact);
+        }
+        async function speak(text) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-tts:generateContent?key=${apiKey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `こどもに優しく話して：${text}` }] }], generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } })
+                });
+                const data = await res.json();
+                const bin = atob(data.candidates[0].content.parts[0].inlineData.data);
+                const buf = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+                const head = new ArrayBuffer(44); const d = new DataView(head);
+                const s = (o, str) => { for (let i = 0; i < str.length; i++) d.setUint8(o + i, str.charCodeAt(i)); };
+                s(0, 'RIFF'); d.setUint32(4, 36 + buf.length, true); s(8, 'WAVE'); s(12, 'fmt ');
+                d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+                d.setUint32(24, 24000, true); d.setUint32(28, 48000, true); d.setUint16(32, 2, true);
+                d.setUint16(34, 16, true); s(36, 'data'); d.setUint32(40, buf.length, true);
+                const blob = new Blob([head, buf], { type: 'audio/wav' });
+                new Audio(URL.createObjectURL(blob)).play();
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>
