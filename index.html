@@ -2,19 +2,19 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>魔法のトーストタイマー</title>
+    <title>魔法のトーストタイマー (Cloudflare版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #fffaf2; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
         .card { background: white; border-radius: 30px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 350px; border: 5px solid #ffedda; text-align: center; }
         .hidden { display: none; }
-        #log { color: #ef4444; font-size: 11px; background: #fee2e2; padding: 10px; border-radius: 10px; margin-top: 10px; display: none; text-align: left; }
+        #log { color: #ef4444; font-size: 11px; background: #fee2e2; padding: 10px; border-radius: 10px; margin-top: 10px; display: none; text-align: left; word-break: break-all; }
     </style>
 </head>
 <body>
     <div id="login" class="card">
         <h1 class="text-xl font-bold text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <p class="text-xs mb-2">APIキーを入力してください</p>
+        <p class="text-xs mb-2">Google AI Studioのキーを入力</p>
         <input type="password" id="key" placeholder="AIza...で始まるキー" class="border p-2 w-full rounded mb-2 text-center">
         <div id="log"></div>
         <button id="btn" onclick="check()" class="bg-orange-600 text-white p-3 w-full rounded-xl font-bold mt-2">スタート！</button>
@@ -24,9 +24,9 @@
             <div id="time" class="text-6xl font-bold">03:00</div>
         </div>
         <p class="text-sm text-green-600 font-bold mt-4">✨ 接続成功！</p>
-        <p id="info" class="text-[9px] text-gray-400 mt-2"></p>
+        <p class="text-xs text-gray-500 mt-2">クラウドフレア経由で接続しました</p>
     </div>
-    <script>
+<script>
         async function check() {
             const key = document.getElementById('key').value.trim();
             const log = document.getElementById('log');
@@ -36,53 +36,44 @@
             
             log.style.display = "block";
             log.style.color = "orange";
-            log.innerText = "利用可能なAIを探しています...";
+            log.innerText = "AIを呼び出しています...";
             btn.disabled = true;
 
+            // Cloudflare環境でも通りやすい標準エンドポイント
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+
             try {
-                // 手順1: 今のキーで使えるモデルの一覧を取得する
-                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
-                const listRes = await fetch(listUrl);
-                const listData = await listRes.json();
-
-                if (!listRes.ok) {
-                    throw new Error(listData.error ? listData.error.message : "キーが正しくありません");
-                }
-
-                // 手順2: リストの中から generateContent が使えるモデルを探す
-                const targetModel = listData.models.find(m => 
-                    m.supportedGenerationMethods.includes("generateContent") && 
-                    (m.name.includes("gemini-1.5-flash") || m.name.includes("gemini-pro"))
-                );
-
-                if (!targetModel) {
-                    throw new Error("このキーで使える適切なAIが見つかりませんでした");
-                }
-
-                // 手順3: 見つかったモデルでテスト通信
-                const testUrl = `https://generativelanguage.googleapis.com/v1beta/${targetModel.name}:generateContent?key=${key}`;
-                const testRes = await fetch(testUrl, {
+                const res = await fetch(url, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    // 通信を安定させるための最小限のデータ
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Short hello" }] }]
+                    })
                 });
 
-                if (testRes.ok) {
+                const data = await res.json();
+
+                if (res.ok) {
                     document.getElementById('login').className = "hidden";
                     document.getElementById('main').className = "card";
-                    document.getElementById('info').innerText = "Model: " + targetModel.name;
                 } else {
-                    const testData = await testRes.json();
-                    throw new Error(testData.error.message);
+                    log.style.color = "#ef4444";
+                    // Googleからのエラー内容を詳しく表示
+                    let errorMsg = data.error ? data.error.message : "不明なエラー";
+                    log.innerHTML = `<b>エラーが発生しました</b><br>
+                                    内容: ${errorMsg}<br>
+                                    <span style="font-size:9px">※キーがGemini 1.5に対応していない可能性があります。</span>`;
                 }
-
             } catch (e) {
                 log.style.color = "#ef4444";
-                log.innerHTML = `<b>エラーが発生しました</b><br>理由: ${e.message}`;
+                log.innerText = "ネットワークエラー: Cloudflareからの通信がブロックされました。";
             } finally {
                 btn.disabled = false;
             }
         }
     </script>
 </body>
-</html>
+</html>    
