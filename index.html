@@ -2,153 +2,67 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>魔法のトーストタイマー</title>
+    <title>魔法のタイマー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap');
-        body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #fffaf2; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); width: 100%; max-width: 400px; border: 8px solid #ffedda; }
-        .timer-bg { background: linear-gradient(135deg, #f97316, #ef4444); color: white; border-radius: 30px; padding: 40px 20px; text-align: center; margin-bottom: 20px; }
-        .circle-btn { width: 55px; height: 55px; border-radius: 50%; border: 3px solid #ffedda; background: white; font-weight: bold; color: #f97316; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .magic-btn { background: #ea580c; color: white; border-radius: 20px; padding: 15px; font-weight: 900; width: 100%; font-size: 18px; box-shadow: 0 5px 0 #9a3412; cursor: pointer; }
-        .magic-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #9a3412; }
-        .magic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        input { border: 3px solid #ffedda; border-radius: 15px; padding: 12px; width: 100%; text-align: center; font-size: 16px; margin-bottom: 10px; outline: none; }
-        .error-log { color: #ef4444; font-size: 12px; font-weight: bold; margin-top: 10px; background: #fee2e2; padding: 10px; border-radius: 10px; display: none; }
+        body { background: #fffaf2; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
+        .card { background: white; border-radius: 30px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 350px; border: 5px solid #ffedda; text-align: center; }
         .hidden { display: none; }
+        #errorLog { color: #ef4444; font-size: 11px; background: #fee2e2; padding: 10px; border-radius: 10px; margin-top: 10px; display: none; text-align: left; word-break: break-all; }
     </style>
 </head>
 <body>
-    <div id="loginPage" class="card text-center">
-        <h1 class="text-2xl font-black text-orange-600 mb-6">🍞 魔法のタイマー</h1>
-        <p class="text-sm text-gray-500 mb-4">APIキーを貼り付けてね</p>
-        <input type="password" id="apiKeyInput" placeholder="ここに入力">
-        <div id="loginError" class="error-log mb-4"></div>
-        <button id="loginBtn" onclick="checkKey()" class="magic-btn">スタート！</button>
+    <div id="login" class="card">
+        <h1 class="text-xl font-bold text-orange-600 mb-4">🍞 魔法のタイマー</h1>
+        <p class="text-xs mb-2">APIキーを入力してね</p>
+        <input type="password" id="keyInput" placeholder="AIza...で始まるキー" class="border p-2 w-full rounded mb-2 text-center">
+        <div id="errorLog"></div>
+        <button id="btn" onclick="check()" class="bg-orange-600 text-white p-3 w-full rounded-xl font-bold mt-2">スタート！</button>
     </div>
-    <div id="mainPage" class="card hidden text-center">
-        <div class="timer-bg">
-            <div id="txtTime" class="text-7xl font-black">03:00</div>
-            <p class="text-xs mt-2 font-bold opacity-80">おいしくなる魔法の時間</p>
+    <div id="main" class="card hidden">
+        <div class="bg-orange-500 text-white rounded-2xl p-6 mb-4">
+            <div id="time" class="text-6xl font-bold">03:00</div>
         </div>
-        <div class="space-y-6 mb-6">
-            <div class="flex justify-between items-center">
-                <span class="font-black text-red-500">温度(℃)</span>
-                <div class="flex items-center gap-3">
-                    <button onclick="adjT(-10)" class="circle-btn">ー</button>
-                    <span id="txtT" class="text-2xl font-black w-14">200</span>
-                    <button onclick="adjT(10)" class="circle-btn">＋</button>
-                </div>
-            </div>
-            <div class="border-t-4 border-orange-50 pt-6">
-                <input type="text" id="breadInput" placeholder="パンの名前 (例: メロンパン)">
-                <button id="aiBtn" onclick="askAi()" class="magic-btn text-sm py-3">AIに相談して設定 ✨</button>
-                <p id="statusMsg" class="text-xs font-bold text-orange-500 mt-3 h-4"></p>
-            </div>
-        </div>
+        <p id="tempText" class="font-bold">温度: 200℃</p>
+        <p class="text-sm text-green-600 font-bold mt-4">✨ キーは正解です！</p>
     </div>
     <script>
-        let apiKey = "";
-        let currentT = 200;
-        const MODEL = "gemini-1.5-flash"; // 安定して動くモデル名
-
-        // 1. キーが正しいかチェックする
-        async function checkKey() {
-            const input = document.getElementById('apiKeyInput');
-            const errDiv = document.getElementById('loginError');
-            const btn = document.getElementById('loginBtn');
-            const val = input.value.trim();
-
-            if (!val) {
-                errDiv.innerText = "キーを入力してください";
-                errDiv.style.display = "block";
-                return;
-            }
-
+        async function check() {
+            const key = document.getElementById('keyInput').value.trim();
+            const log = document.getElementById('errorLog');
+            const btn = document.getElementById('btn');
+            
+            if(!key) { log.innerText = "キーが空っぽだよ"; log.style.display="block"; return; }
+            
+            log.style.display = "block";
+            log.style.color = "orange";
+            log.innerText = "チェック中...";
             btn.disabled = true;
-            errDiv.style.display = "none";
 
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${val}`;
+                // 確実に動く最新のURL
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "hi" }] }] })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
                 });
 
                 const data = await res.json();
 
                 if (res.ok) {
-                    apiKey = val;
-                    document.getElementById('loginPage').classList.add('hidden');
-                    document.getElementById('mainPage').classList.remove('hidden');
-                    updateUI();
+                    document.getElementById('login').className = "hidden";
+                    document.getElementById('main').className = "card";
                 } else {
-                    // キーが間違っている理由を表示
-                    let msg = "キーが正しくありません";
-                    if (data.error) {
-                        msg = "エラー理由: " + data.error.message;
-                    }
-                    errDiv.innerText = msg;
-                    errDiv.style.display = "block";
+                    // エラーの中身をそのまま表示
+                    log.style.color = "#ef4444";
+                    log.innerHTML = `<b>エラーが発生しました</b><br>
+                                    理由: ${data.error ? data.error.message : "不明"}<br>
+                                    状態: ${data.error ? data.error.status : "NULL"}`;
                 }
             } catch (e) {
-                errDiv.innerText = "インターネットがつながっていません";
-                errDiv.style.display = "block";
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        // 2. 温度（おんど）を変える
-        function adjT(v) {
-            currentT = Math.max(100, Math.min(250, currentT + v));
-            document.getElementById('txtT').innerText = currentT;
-            updateUI();
-        }
-
-        // 3. 画面の時間を更新（こうしん）する
-        function updateUI() {
-            let sec = Math.round(180 * (200 / currentT));
-            let m = Math.floor(sec / 60);
-            let s = sec % 60;
-            document.getElementById('txtTime').innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-        }
-
-        // 4. AIに相談（そうだん）する
-        async function askAi() {
-            const bread = document.getElementById('breadInput').value || "トースト";
-            const status = document.getElementById('statusMsg');
-            const btn = document.getElementById('aiBtn');
-            
-            btn.disabled = true;
-            status.innerText = "AIが考え中...";
-
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: `「${bread}」を焼くおすすめの温度を数値だけで教えて。例: 180` }] }]
-                    })
-                });
-
-                const data = await res.json();
-                const text = data.candidates[0].content.parts[0].text;
-                const match = text.match(/\d+/);
-                
-                if (match) {
-                    currentT = parseInt(match[0]);
-                    document.getElementById('txtT').innerText = currentT;
-                    updateUI();
-                    status.innerText = "✨ おすすめの温度にセットしました！";
-                } else {
-                    status.innerText = "温度を読み取れませんでした";
-                }
-            } catch (e) {
-                status.innerText = "❌ 相談に失敗しました";
+                log.innerText = "ネットワークがつながっていないか、URLが間違っています。";
+                log.style.color = "#ef4444";
             } finally {
                 btn.disabled = false;
             }
