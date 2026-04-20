@@ -7,8 +7,8 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@900&display=swap');
         body { font-family: 'Zen Maru Gothic', sans-serif; background: #fffaf2; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 100%; max-width: 380px; border: 6px solid #ffedda; }
-        .timer-bg { background: linear-gradient(135deg, #f97316, #ef4444); border-radius: 30px; padding: 35px 10px; text-align: center; color: white; margin-bottom: 20px; }
+        .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); width: 100%; max-width: 380px; border: 6px solid #ffedda; text-align: center; }
+        .timer-bg { background: linear-gradient(135deg, #f97316, #ef4444); border-radius: 30px; padding: 35px 10px; color: white; margin-bottom: 20px; }
         .btn-magic { background: #ea580c; color: white; border-radius: 18px; padding: 14px; font-weight: 900; width: 100%; box-shadow: 0 4px 0 #9a3412; cursor: pointer; border: none; }
         .btn-magic:active { transform: translateY(2px); box-shadow: 0 2px 0 #9a3412; }
         input { border: 3px solid #ffedda; border-radius: 12px; padding: 10px; width: 100%; text-align: center; margin-bottom: 10px; outline: none; }
@@ -17,14 +17,13 @@
     </style>
 </head>
 <body>
-    <div id="login" class="card text-center">
+    <div id="login" class="card">
         <h1 class="text-xl font-black text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <p class="text-[10px] text-gray-400 mb-2">最適なAIを自動で探します</p>
         <input type="password" id="key" placeholder="APIキーを入力">
         <div id="log"></div>
         <button id="sBtn" onclick="check()" class="btn-magic mt-2">スタート！</button>
     </div>
-    <div id="main" class="card hidden text-center">
+    <div id="main" class="card hidden">
         <div class="timer-bg">
             <div id="disp" class="text-7xl font-black">03:00</div>
         </div>
@@ -38,11 +37,12 @@
         </div>
         <input type="text" id="bread" placeholder="パンの名前" class="mt-6">
         <button id="aiBtn" onclick="ask()" class="btn-magic text-sm mt-2">AIに相談 ✨</button>
-        <p id="usedModel" class="text-[8px] text-gray-300 mt-4"></p>
-    </div><script>
+    </div>
+     <script>
         let k = "";
         let t = 200;
-        let activeModel = "";
+        // Pythonの例と同じ「models/」を含めた指定方法
+        const MODEL_ID = "models/gemini-1.5-flash";
 
         async function check() {
             const val = document.getElementById('key').value.trim();
@@ -52,41 +52,30 @@
 
             btn.disabled = true;
             log.style.display = "block";
-            log.style.color = "orange";
-            log.innerText = "利用可能なAIを探索中...";
+            log.innerText = "Python準拠モードで接続中...";
 
-            // 試行するモデルの優先リスト
-            const models = [
-                "gemini-1.5-flash-latest",
-                "gemini-1.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-pro"
-            ];
+            try {
+                // URLの中で "models/gemini-1.5-flash" が正しく認識される形式
+                const url = `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:generateContent?key=${val}`;
+                
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                });
 
-            for (let mName of models) {
-                try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${val}`;
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
-                    });
-
-                    if (res.ok) {
-                        k = val;
-                        activeModel = mName;
-                        document.getElementById('login').className = "hidden";
-                        document.getElementById('main').className = "card";
-                        document.getElementById('usedModel').innerText = "Connected: " + mName;
-                        update();
-                        return; // 成功したら終了
-                    }
-                } catch (e) { continue; }
-            }
-
-            log.style.color = "#ef4444";
-            log.innerText = "エラー: 適切なAIモデルが見つかりませんでした。キーと設定を確認してください。";
-            btn.disabled = false;
+                const data = await res.json();
+                if (res.ok) {
+                    k = val;
+                    document.getElementById('login').className = "hidden";
+                    document.getElementById('main').className = "card";
+                    update();
+                } else {
+                    log.innerText = "エラー: " + (data.error ? data.error.message : "接続失敗");
+                }
+            } catch (e) {
+                log.innerText = "ネットワークエラー";
+            } finally { btn.disabled = false; }
         }
 
         function adj(v) {
@@ -105,11 +94,11 @@
             const btn = document.getElementById('aiBtn');
             btn.disabled = true;
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${k}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:generateContent?key=${k}`;
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({contents: [{parts: [{text: `${b}を焼く温度を数字1つで答えて`}]}]})
+                    body: JSON.stringify({contents: [{parts: [{text: `${b}を焼く温度を数値1つで答えて`}]}]})
                 });
                 const data = await res.json();
                 const n = data.candidates[0].content.parts[0].text.match(/\d+/);
