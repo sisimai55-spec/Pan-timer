@@ -12,14 +12,15 @@
         .btn-magic { background: #ea580c; color: white; border-radius: 18px; padding: 14px; font-weight: 900; width: 100%; box-shadow: 0 4px 0 #9a3412; cursor: pointer; border: none; }
         .btn-magic:active { transform: translateY(2px); box-shadow: 0 2px 0 #9a3412; }
         input { border: 3px solid #ffedda; border-radius: 12px; padding: 10px; width: 100%; text-align: center; margin-bottom: 10px; outline: none; }
-        #log { color: #ef4444; font-size: 11px; margin-top: 10px; background: #fee2e2; padding: 10px; border-radius: 10px; display: none; text-align: left; }
+        #log { color: #ef4444; font-size: 11px; margin-top: 10px; background: #fee2e2; padding: 10px; border-radius: 10px; display: none; text-align: left; word-break: break-all; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
     <div id="login" class="card">
         <h1 class="text-xl font-black text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <input type="password" id="key" placeholder="APIキーを入力">
+        <p class="text-[10px] text-gray-400 mb-4">Pythonの設定に合わせて接続を自動調整します</p>
+        <input type="password" id="key" placeholder="APIキーを貼り付け">
         <div id="log"></div>
         <button id="sBtn" onclick="check()" class="btn-magic mt-2">スタート！</button>
     </div>
@@ -35,12 +36,14 @@
                 <button onclick="adj(10)" class="text-2xl font-bold border-2 border-orange-100 rounded-full w-10 h-10">+</button>
             </div>
         </div>
-        <input type="text" id="bread" placeholder="パンの名前" class="mt-6 text-center border-2 border-orange-50 rounded-lg p-2 w-full">
+        <input type="text" id="bread" placeholder="パンの名前" class="mt-6 border-2 border-orange-50 rounded-lg p-2">
         <button id="aiBtn" onclick="ask()" class="btn-magic text-sm mt-2">AIに相談 ✨</button>
+        <p id="successInfo" class="text-[8px] text-gray-300 mt-4"></p>
     </div>
-   <script>
+    <script>
         let k = "";
         let t = 200;
+        let workingUrl = "";
 
         async function check() {
             const val = document.getElementById('key').value.trim();
@@ -50,33 +53,41 @@
 
             btn.disabled = true;
             log.style.display = "block";
-            log.innerText = "接続テスト中...";
+            log.innerText = "最適な接続ルートを探しています...";
 
-            try {
-                // Python版と同じ 'models/gemini-1.5-flash' を、URLの正しい位置に組み込みます
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`;
-                
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        contents: [{parts: [{text: "Hi"}]}]
-                    })
-                });
+            // Python版が使っているルートを含む、3つの候補
+            const targets = [
+                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${val}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${val}`
+            ];
 
-                const data = await res.json();
-                if (res.ok) {
-                    k = val;
-                    document.getElementById('login').className = "hidden";
-                    document.getElementById('main').className = "card";
-                    update();
-                } else {
-                    // ここで詳しいエラー理由を表示
-                    log.innerText = "エラー: " + (data.error ? data.error.message : "接続失敗");
-                }
-            } catch (e) {
-                log.innerText = "通信エラーが発生しました";
-            } finally { btn.disabled = false; }
+            for (let url of targets) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ contents: [{ parts: [{ text: "hi" }] }] })
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        k = val;
+                        workingUrl = url.split(':generateContent')[0]; // ベースURLを保存
+                        document.getElementById('login').className = "hidden";
+                        document.getElementById('main').className = "card";
+                        document.getElementById('successInfo').innerText = "Route OK: " + url.split('/')[3];
+                        update();
+                        return;
+                    } else if (data.error && data.error.message.includes("quota")) {
+                        log.innerText = "回数制限エラーです。30秒待ってからやり直してね！";
+                        btn.disabled = false; return;
+                    }
+                } catch (e) { continue; }
+            }
+
+            log.innerText = "すべての接続ルートが失敗しました。キーが正しいか確認してください。";
+            btn.disabled = false;
         }
 
         function adj(v) {
@@ -95,14 +106,10 @@
             const btn = document.getElementById('aiBtn');
             btn.disabled = true;
             try {
-                // 実際の質問用URL
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`;
-                const res = await fetch(url, {
+                const res = await fetch(`${workingUrl}:generateContent?key=${k}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        contents: [{parts: [{text: `${b}を焼く温度を数字1つで答えて`}]}]
-                    })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `${b}を焼く温度を数値1つで答えて` }] }] })
                 });
                 const data = await res.json();
                 const n = data.candidates[0].content.parts[0].text.match(/\d+/);
@@ -112,4 +119,4 @@
         }
     </script>
 </body>
-</html> 
+</html>
