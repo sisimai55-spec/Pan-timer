@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>魔法のトーストタイマー</title>
+    <title>魔法のトーストタイマー (最終診断版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@900&display=swap');
@@ -12,37 +12,28 @@
         .btn-magic { background: #ea580c; color: white; border-radius: 18px; padding: 14px; font-weight: 900; width: 100%; box-shadow: 0 4px 0 #9a3412; cursor: pointer; border: none; }
         .btn-magic:active { transform: translateY(2px); box-shadow: 0 2px 0 #9a3412; }
         input { border: 3px solid #ffedda; border-radius: 12px; padding: 10px; width: 100%; text-align: center; margin-bottom: 10px; outline: none; }
-        #log { color: #ef4444; font-size: 11px; margin-top: 10px; background: #fee2e2; padding: 10px; border-radius: 10px; display: none; text-align: left; word-break: break-all; }
+        #log { color: #ef4444; font-size: 11px; margin-top: 10px; background: #fee2e2; padding: 10px; border-radius: 10px; display: none; text-align: left; white-space: pre-wrap; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
     <div id="login" class="card">
         <h1 class="text-xl font-black text-orange-600 mb-4">🍞 魔法のタイマー</h1>
-        <p class="text-[10px] text-gray-400 mb-4">Pythonの設定に合わせて接続を自動調整します</p>
-        <input type="password" id="key" placeholder="APIキーを貼り付け">
+        <p class="text-[10px] text-gray-500 mb-4">Pythonで動くキーなら、必ず繋がるルートを探します</p>
+        <input type="password" id="key" placeholder="APIキーを入力">
         <div id="log"></div>
-        <button id="sBtn" onclick="check()" class="btn-magic mt-2">スタート！</button>
+        <button id="sBtn" onclick="check()" class="btn-magic mt-2">接続テスト開始！</button>
     </div>
     <div id="main" class="card hidden">
         <div class="timer-bg">
             <div id="disp" class="text-7xl font-black">03:00</div>
         </div>
-        <div class="flex justify-between items-center px-4">
-            <span class="font-bold text-orange-600">温度(℃)</span>
-            <div class="flex items-center gap-4">
-                <button onclick="adj(-10)" class="text-2xl font-bold border-2 border-orange-100 rounded-full w-10 h-10">-</button>
-                <span id="temp" class="text-xl font-bold">200</span>
-                <button onclick="adj(10)" class="text-2xl font-bold border-2 border-orange-100 rounded-full w-10 h-10">+</button>
-            </div>
-        </div>
-        <input type="text" id="bread" placeholder="パンの名前" class="mt-6 border-2 border-orange-50 rounded-lg p-2">
-        <button id="aiBtn" onclick="ask()" class="btn-magic text-sm mt-2">AIに相談 ✨</button>
-        <p id="successInfo" class="text-[8px] text-gray-300 mt-4"></p>
+        <p class="text-green-600 font-bold mb-4">✨ 接続に成功しました！</p>
+        <button id="aiBtn" onclick="ask()" class="btn-magic text-sm">AIにトーストの温度を聞く ✨</button>
+        <p id="successInfo" class="text-[9px] text-gray-400 mt-4"></p>
     </div>
     <script>
         let k = "";
-        let t = 200;
         let workingUrl = "";
 
         async function check() {
@@ -53,16 +44,20 @@
 
             btn.disabled = true;
             log.style.display = "block";
-            log.innerText = "最適な接続ルートを探しています...";
+            log.style.color = "orange";
+            log.innerText = "診断中...";
 
-            // Python版が使っているルートを含む、3つの候補
-            const targets = [
-                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${val}`,
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`,
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${val}`
+            // 接続可能なすべてのパターンをテスト
+            const tests = [
+                { ver: "v1", mod: "gemini-1.5-flash" },
+                { ver: "v1beta", mod: "gemini-1.5-flash" },
+                { ver: "v1beta", mod: "gemini-1.5-flash-latest" }
             ];
 
-            for (let url of targets) {
+            let errors = [];
+
+            for (let t of tests) {
+                const url = `https://generativelanguage.googleapis.com/${t.ver}/models/${t.mod}:generateContent?key=${val}`;
                 try {
                     const res = await fetch(url, {
                         method: 'POST',
@@ -73,48 +68,38 @@
                     
                     if (res.ok) {
                         k = val;
-                        workingUrl = url.split(':generateContent')[0]; // ベースURLを保存
+                        workingUrl = url;
                         document.getElementById('login').className = "hidden";
                         document.getElementById('main').className = "card";
-                        document.getElementById('successInfo').innerText = "Route OK: " + url.split('/')[3];
-                        update();
+                        document.getElementById('successInfo').innerText = "成功ルート: " + t.ver + " / " + t.mod;
                         return;
-                    } else if (data.error && data.error.message.includes("quota")) {
-                        log.innerText = "回数制限エラーです。30秒待ってからやり直してね！";
-                        btn.disabled = false; return;
+                    } else {
+                        errors.push(`【${t.ver}】${data.error.message}`);
                     }
-                } catch (e) { continue; }
+                } catch (e) {
+                    errors.push(`【${t.ver}】通信エラー`);
+                }
             }
 
-            log.innerText = "すべての接続ルートが失敗しました。キーが正しいか確認してください。";
+            log.style.color = "#ef4444";
+            log.innerText = "❌ 全ルート失敗\n" + errors.join("\n");
             btn.disabled = false;
         }
 
-        function adj(v) {
-            t = Math.max(100, Math.min(250, t + v));
-            document.getElementById('temp').innerText = t;
-            update();
-        }
-
-        function update() {
-            let s = Math.round(180 * (200 / t));
-            document.getElementById('disp').innerText = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-        }
-
         async function ask() {
-            const b = document.getElementById('bread').value || "トースト";
             const btn = document.getElementById('aiBtn');
             btn.disabled = true;
             try {
-                const res = await fetch(`${workingUrl}:generateContent?key=${k}`, {
+                const res = await fetch(workingUrl, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `${b}を焼く温度を数値1つで答えて` }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "トーストを焼く温度を数字1つで答えて" }] }] })
                 });
                 const data = await res.json();
-                const n = data.candidates[0].content.parts[0].text.match(/\d+/);
-                if(n) { t = parseInt(n[0]); document.getElementById('temp').innerText = t; update(); }
-            } catch(e) {}
+                alert("AIの回答: " + data.candidates[0].content.parts[0].text + "度");
+            } catch(e) {
+                alert("エラーが発生しました");
+            }
             btn.disabled = false;
         }
     </script>
