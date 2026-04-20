@@ -35,14 +35,12 @@
                 <button onclick="adj(10)" class="text-2xl font-bold border-2 border-orange-100 rounded-full w-10 h-10">+</button>
             </div>
         </div>
-        <input type="text" id="bread" placeholder="パンの名前" class="mt-6">
+        <input type="text" id="bread" placeholder="パンの名前" class="mt-6 text-center border-2 border-orange-50 rounded-lg p-2 w-full">
         <button id="aiBtn" onclick="ask()" class="btn-magic text-sm mt-2">AIに相談 ✨</button>
     </div>
-     <script>
+   <script>
         let k = "";
         let t = 200;
-        // Pythonの例と同じ「models/」を含めた指定方法
-        const MODEL_ID = "models/gemini-1.5-flash";
 
         async function check() {
             const val = document.getElementById('key').value.trim();
@@ -52,16 +50,18 @@
 
             btn.disabled = true;
             log.style.display = "block";
-            log.innerText = "Python準拠モードで接続中...";
+            log.innerText = "接続テスト中...";
 
             try {
-                // URLの中で "models/gemini-1.5-flash" が正しく認識される形式
-                const url = `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:generateContent?key=${val}`;
+                // Python版と同じ 'models/gemini-1.5-flash' を、URLの正しい位置に組み込みます
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`;
                 
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                    body: JSON.stringify({
+                        contents: [{parts: [{text: "Hi"}]}]
+                    })
                 });
 
                 const data = await res.json();
@@ -71,10 +71,11 @@
                     document.getElementById('main').className = "card";
                     update();
                 } else {
+                    // ここで詳しいエラー理由を表示
                     log.innerText = "エラー: " + (data.error ? data.error.message : "接続失敗");
                 }
             } catch (e) {
-                log.innerText = "ネットワークエラー";
+                log.innerText = "通信エラーが発生しました";
             } finally { btn.disabled = false; }
         }
 
@@ -94,11 +95,14 @@
             const btn = document.getElementById('aiBtn');
             btn.disabled = true;
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:generateContent?key=${k}`;
+                // 実際の質問用URL
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`;
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({contents: [{parts: [{text: `${b}を焼く温度を数値1つで答えて`}]}]})
+                    body: JSON.stringify({
+                        contents: [{parts: [{text: `${b}を焼く温度を数字1つで答えて`}]}]
+                    })
                 });
                 const data = await res.json();
                 const n = data.candidates[0].content.parts[0].text.match(/\d+/);
@@ -108,4 +112,4 @@
         }
     </script>
 </body>
-</html>
+</html> 
