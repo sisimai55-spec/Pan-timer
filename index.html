@@ -7,24 +7,49 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap');
         body { font-family: 'Zen Maru Gothic', sans-serif; background: #fffaf2; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .card { background: white; border-radius: 40px; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); width: 100%; max-width: 480px; border: 8px solid #ffedda; }
+        
+        /* 共通の枠付きカードスタイル */
+        .card { 
+            background: white; 
+            border-radius: 40px; 
+            padding: 30px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.05); 
+            width: 100%; 
+            max-width: 480px; 
+            border: 8px solid #ffedda; 
+        }
+
         .timer-bg { background: linear-gradient(135deg, #f97316, #ef4444); border-radius: 30px; padding: 20px; color: white; margin-bottom: 20px; text-align: center; }
         .btn-magic { background: #ea580c; color: white; border-radius: 12px; padding: 10px; font-weight: 900; width: 100%; box-shadow: 0 4px 0 #9a3412; cursor: pointer; transition: 0.2s; }
         .btn-magic:active { transform: translateY(2px); box-shadow: 0 2px 0 #9a3412; }
         .grid-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
         .manual-panel { background: #fdf2f2; border-radius: 20px; padding: 15px; margin-top: 15px; border: 2px solid #fee2e2; }
-        select, input[type="text"] { border: 2px solid #ffedda; border-radius: 10px; padding: 8px; width: 100%; text-align: center; outline: none; background: white; }
+        select, input[type="text"], input[type="password"] { border: 2px solid #ffedda; border-radius: 10px; padding: 8px; width: 100%; text-align: center; outline: none; background: white; }
         .info-box { background: #fffaf2; border: 2px dashed #ffedda; border-radius: 15px; padding: 12px; font-size: 13px; min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; margin-top: 15px; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
+
+    <!-- 枠付きのキー入力画面 -->
     <div id="login" class="card text-center">
-        <h1 class="text-2xl font-black text-orange-600 mb-6">🍞 魔法のタイマー</h1>
-        <input type="password" id="key" placeholder="APIキーを入力" class="mb-4">
-        <button onclick="checkKey()" class="btn-magic">スタート！</button>
+        <div class="mb-6">
+            <span class="text-5xl">🔥</span>
+            <h1 class="text-2xl font-black text-orange-600 mt-2">魔法のタイマー</h1>
+            <p class="text-gray-400 text-xs mt-1">APIキーを入力して魔法をかけよう</p>
+        </div>
+        
+        <div class="space-y-4">
+            <input type="password" id="key" placeholder="ここにAPIキーをペースト">
+            <button onclick="checkKey()" class="btn-magic">
+                キッチンに入る 🍞✨
+            </button>
+        </div>
+        
+        <p id="log" class="text-red-500 text-[10px] mt-4 hidden"></p>
     </div>
 
+    <!-- メイン画面 -->
     <div id="main" class="card hidden">
         <div class="timer-bg">
             <div id="disp" class="text-7xl font-black">03:00</div>
@@ -33,7 +58,6 @@
 
         <input type="text" id="bread" placeholder="例：食パン、バゲット">
         
-        <!-- 手動調整パネル -->
         <div class="manual-panel space-y-3">
             <div class="flex justify-between items-center gap-2">
                 <span class="text-xs font-bold text-red-400">枚切数</span>
@@ -66,6 +90,7 @@
             <p id="infoText" class="text-gray-700 font-bold">手動調整もAIおまかせも自由自在！</p>
         </div>
     </div>
+
     <script>
         let apiKey = "";
         let currentT = 200;
@@ -74,30 +99,48 @@
 
         async function checkKey() {
             const val = document.getElementById('key').value.trim();
+            const log = document.getElementById('log');
             if(!val) return;
-            apiKey = val;
-            document.getElementById('login').classList.add('hidden');
-            document.getElementById('main').classList.remove('hidden');
+            
+            log.innerText = "接続確認中...";
+            log.classList.remove('hidden');
+            log.style.color = "orange";
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${val}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                });
+                
+                if (res.ok) {
+                    apiKey = val;
+                    document.getElementById('login').classList.add('hidden');
+                    document.getElementById('main').classList.remove('hidden');
+                } else {
+                    log.innerText = "キーが正しくないか、制限がかかっています。";
+                    log.style.color = "red";
+                }
+            } catch (e) {
+                log.innerText = "ネットワークエラーが発生しました。";
+                log.style.color = "red";
+            }
         }
 
-        // 手動で温度を調整
         function adjTemp(v) {
             currentT = Math.max(100, Math.min(250, currentT + v));
             document.getElementById('tempVal').innerText = currentT;
             manualAdj();
         }
 
-        // 手動設定（枚切数と温度から時間を計算）
         function manualAdj() {
             const slice = parseInt(document.getElementById('slices').value);
-            // 厚いほど（枚数が少ないほど）長く焼く
             let baseSec = 180; 
             if(slice == 4) baseSec = 240;
             if(slice == 5) baseSec = 210;
             if(slice == 6) baseSec = 180;
             if(slice == 8) baseSec = 150;
 
-            // 温度による補正 (200度を基準)
             timerSec = Math.round(baseSec * (200 / currentT));
             updateDisp();
         }
@@ -105,7 +148,6 @@
         async function getAI(mode) {
             const bread = document.getElementById('bread').value || "トースト";
             const infoText = document.getElementById('infoText');
-            
             infoText.innerText = "考え中...";
             
             let prompt = "";
@@ -126,7 +168,7 @@
                 if(mode === 'auto') {
                     currentT = parseInt(result.match(/\d+/)) || 200;
                     document.getElementById('tempVal').innerText = currentT;
-                    manualAdj(); // 自動で得た温度をもとに時間を再計算
+                    manualAdj();
                     infoText.innerText = `AIが${currentT}度に設定しました！`;
                 } else if(mode === 'trivia') {
                     infoText.innerText = "🔊 豆知識を読み上げ中...";
